@@ -43,3 +43,6 @@ jobs:
       - name: Diagnose dot-sync ranking in shifted all-ships frames
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/diagnose_candidate_ranking.py
+      - name: Diagnose dot synchronizer versus timing fallback
+        if: github.ref_name == 'experiment/frequency-offset-once'
+        run: python scripts/diagnose_dot_sync_fallback.py
