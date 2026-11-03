@@ -353,3 +353,28 @@ file):
 
 MIT — do what you like, including commercial use; attribution appreciated.
 See [LICENSE](LICENSE).
+
+## VK4TMZ fork: experimental dot-pattern performance branch
+
+The `perf/dot-pattern-optimisation` branch replaces repeated per-offset
+standard-deviation reductions in `_find_dot_pattern()` with float64 prefix
+moments and calculates the fixed reference norm only once. Search positions,
+correlation thresholds, and accepted DSC frame criteria are unchanged, but
+floating-point results may differ slightly. **Do not deploy without fixture
+parity checks and Pi-side timing measurements.** The original
+`blackwellj/vhf-dsc` repository is unchanged.
+
+To compare the fork against its original `origin/master` implementation,
+from a checkout of this fork:
+
+```bash
+python3 test_samples.py
+python3 scripts/benchmark_dot_pattern.py
+# Full six-fixture baseline/optimised comparison:
+python3 scripts/benchmark_dot_pattern.py --all
+```
+
+This benchmark uses only bundled WAVs and does not interact with radios,
+KA9Q multicast, or a running DSC listener. It checks recovered call identity,
+kind, raw symbols, and ECC, and reports wall-clock speedups. A further
+end-to-end trial of the KA9Q DSC integration is necessary before deployment.
