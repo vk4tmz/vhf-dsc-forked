@@ -6,6 +6,7 @@ Compare baseline and transition-fix at mismatched symbol rates and sample phases
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 from pathlib import Path
 import subprocess
@@ -50,8 +51,11 @@ def errors(decoded, expected):
 
 
 def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--bits", type=int, default=COUNT)
+    args = p.parse_args()
     rng = np.random.default_rng(417)
-    bits = rng.integers(0, 2, COUNT, dtype=np.int8)
+    bits = rng.integers(0, 2, args.bits, dtype=np.int8)
     with tempfile.TemporaryDirectory(prefix="dsc-fsk-check-") as td:
         path = Path(td) / "baseline.py"
         path.write_bytes(subprocess.check_output(
@@ -60,7 +64,7 @@ def main():
             ("baseline", load(path, "clock_baseline")),
             ("transition_fix", load(ROOT / "dsc_decode.py", "clock_experiment")),
         ]
-        print("Synthetic continuous-phase AFSK; 300 known bits; errors/decoded bits")
+        print(f"Synthetic continuous-phase AFSK; {args.bits} known bits; errors/decoded bits")
         for drift in (-1.0, -0.25, 0.0, 0.25, 1.0):
             for phase in (0, 7):
                 y = make_signal(bits, drift, phase, noise_amp=0.08)
