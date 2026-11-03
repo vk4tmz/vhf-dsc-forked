@@ -80,3 +80,57 @@ phase offset, SNR, fading, or adjacent interference.
 4. Keep experimental timing logic off in the deployed KA9Q listener.
 
 No services or deployed configs were changed during this investigation.
+
+## Follow-up: midpoint-discriminator timing recovery
+
+The second experiment, commit `67f5d8d`, replaces the biased early/late
+opposite-tone-energy calculation with a signed mid-symbol transition
+discriminator:
+
+- At each detected bit transition, correlate the midpoint between symbol
+  centres against the same mark/space matched filters.
+- Use a normalized mark-versus-space discriminator for the previous, current,
+  and midpoint symbols.
+- Apply `error = (previous_discriminator - current_discriminator) *
+  midpoint_discriminator` at loop gain 0.1; retain ±0.4-symbol clamping.
+
+The GitHub Actions 300-known-bit synthetic FSK trials with seeded noise
+(0.08 amplitude) show **zero bit errors at both ±0.25% symbol-rate drift**
+and zero nominal drift, at sample phases 0 and 7. This fixes the sign
+asymmetry demonstrated by the first experiment. At ±1% there are still
+roughly 103–106 errors per 300 bits versus 128–134 with recovery disabled,
+so it is not a large-drift acquisition solution.
+
+All six original DSC fixtures and their message parity pass.
+
+### Full-message sensitivity: not yet safe for deployment
+
+A further offline matrix applied slight time-base changes (resampling
+399/400, 400/400 or 401/400, which shifts *both* tones and symbol timing)
+and an optional 0.04 standard deviation noise addition to all five valid
+off-air DSC WAVs. This tests the complete detection, demodulation, candidate
+ranking and message-validation pipeline; unlike the earlier FSK test,
+these are **not isolated transmitter baud-rate errors**.
+
+Across 30 signal/perturbation conditions:
+
+| Decoder | Complete valid DSC calls recovered |
+|---|---:|
+| Stable baseline `9a8a770` | 12 |
+| Revised algorithm, clock recovery OFF | 12 |
+| Revised algorithm, clock recovery ON | 11 |
+
+The revision recovered one all-ships condition which the baseline missed,
+but missed two all-ships conditions which the baseline decoded. The other
+four DSC fixtures were unaffected in this matrix, and all nominal-drift
+recordings passed with recovery enabled or disabled.
+
+**Decision: do not merge or deploy the active timing recovery loop.**
+Bit-error improvement for synthetic data alone is insufficient. The
+full-message results show no net reception gain and some regressions.
+Investigate dot sync, candidate ordering and acquisition under small
+time-base changes, then add strictly non-regressing end-to-end fixtures
+before enabling recovery by default. Keep the validated performance
+branch and running KA9Q services unchanged.
+
+Relevant CI run: https://github.com/vk4tmz/vhf-dsc-forked/actions/runs/41600317544
