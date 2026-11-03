@@ -134,3 +134,54 @@ before enabling recovery by default. Keep the validated performance
 branch and running KA9Q services unchanged.
 
 Relevant CI run: https://github.com/vk4tmz/vhf-dsc-forked/actions/runs/41600317544
+
+## Third experiment: long-range timing-offset tracking
+
+A targeted acquisition investigation showed that simply increasing the
+production top-eight candidate cap does not explain the observed misses:
+valid frames in the examined all-ships cases were already within the top
+eight. On a shifted individual-call fixture, a 48-candidate brute-force
+timing fallback also failed to recover a call. These checks indicate the
+problem is not merely candidate ordering.
+
+Inspection found that `demodulate_candidates` previously added the AFC
+search offset twice (once to measured/default tone frequencies, then
+again inside `_find_dot_pattern` and `_demodulate_with_clock_recovery`).
+An isolated correction preserved the six original fixtures and produced
+12/30 successes on the full DSC drift/noise matrix — still no net gain.
+
+The key discovery was the **±0.4-symbol absolute timing-offset clamp**.
+That bound prevents the midpoint loop from tracking a persistent source
+baud-rate error over several thousand symbols. The isolated
+`experiment/clock-longburst-tracking` branch caps each individual phase
+update at ±0.05 symbols and permits cumulative corrections up to ±16 symbols.
+These are experimental constants and not validated as an optimal PLL.
+
+### Automated results
+
+- Original six DSC fixtures: 6/6 passed, with unchanged call identity and ECC.
+- Synthetic 3,600-bit continuous-phase AFSK, seeded noise: at
+  ±0.25% clock mismatch, revised recovery reported **0 wrong bits among
+  aligned decoded bits** at both tested sample phases. Negative drift
+  produced 3,594 decoded bits, rather than all 3,600; this is not a
+  zero-erasure claim.
+- Full off-air DSC time-base perturbation matrix (five recordings, three
+  timing shifts, two noise levels): baseline/recovery OFF **12/30**,
+  experimental recovery ON **30/30** validated calls.
+- Three-second noise-padded recording matrix (five recordings, three
+  timing shifts): baseline/recovery OFF **5/15**, experimental recovery ON
+  **15/15** validated calls. GitHub x86 runner measured maximum wall time
+  0.225 s OFF and 0.273 s ON for these windows (not Pi 4 timings).
+
+These perturbations resample the entire recording, changing both FSK
+tone frequencies and symbol timing; they are not pure transmitter baud
+drift. Results derive from five known off-air recordings and deterministic
+noise, not diverse live reception conditions.
+
+**Status: promising but still experimental.** The Pi 4 must be used for
+performance benchmarking with real 3-second KA9Q-style PCM windows,
+particularly noise-only windows and CPU backpressure. Receiver integration
+and live deployment are NOT authorised by these tests. Preserve
+`perf/dot-pattern-optimisation` as the stable performance branch.
+
+CI: https://github.com/vk4tmz/vhf-dsc-forked/actions/runs/41602239823
