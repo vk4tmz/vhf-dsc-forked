@@ -29,3 +29,8 @@ jobs:
         run: python scripts/benchmark_dot_pattern.py --all
       - name: Incremental demodulation optimisation comparison
         run: python scripts/benchmark_dot_pattern.py --baseline-ref 5a92c5b --all
+      - name: Diagnose clock recovery enabled versus disabled
+        if: github.ref_name == 'experiment/clock-recovery-transition'
+        run: |
+          python scripts/diagnose_clock_recovery.py --wav samples/individual_call.wav
+          python scripts/diagnose_clock_recovery.py --wav samples/noise.wav
