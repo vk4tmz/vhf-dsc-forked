@@ -1042,9 +1042,14 @@ def _demodulate_with_clock_recovery(
                 timing_error = (
                     previous_discriminator - discriminator
                 ) * midpoint_discriminator
-                timing_offset += timing_gain * timing_error
-                # Keep corrections inside the original ±0.4 symbol bound.
-                timing_offset = max(-0.4, min(0.4, timing_offset))
+                # A fixed ±0.4-symbol cap cannot follow accumulated
+                # baud-rate mismatch across thousands of bits. Bound each
+                # update to reject noise spikes, but allow the phase
+                # accumulator to follow long-term drift. This is strictly
+                # experimental; reception regressions must be measured.
+                adjustment = max(-0.05, min(0.05, timing_gain * timing_error))
+                timing_offset += adjustment
+                timing_offset = max(-16.0, min(16.0, timing_offset))
         previous_bit = bit
         previous_discriminator = discriminator
 
