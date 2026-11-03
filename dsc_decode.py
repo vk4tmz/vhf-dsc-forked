@@ -816,23 +816,36 @@ def _find_dot_pattern(
     best_corr = 0.0
     step = max(1, int(samples_per_bit / 4))  # Quarter-bit resolution
 
+    # The reference is identical at every offset: calculate its norm once.
+    # Compute prefix sums in float64 so each candidate's standard deviation
+    # needs only O(1) arithmetic instead of a separate NumPy reduction.
+    # This keeps the original search offsets and correlation thresholds.
+    ref_norm = ref_dot / (np.std(ref_dot) + 1e-10)
+    sample_sum = np.concatenate(([0.0], np.cumsum(samples, dtype=np.float64)))
+    sample_sq_sum = np.concatenate(
+        ([0.0], np.cumsum(np.square(samples, dtype=np.float64), dtype=np.float64))
+    )
+
+    def window_std(offset: int) -> float:
+        end = offset + pattern_len
+        mean = (sample_sum[end] - sample_sum[offset]) / pattern_len
+        second_moment = (sample_sq_sum[end] - sample_sq_sum[offset]) / pattern_len
+        return float(np.sqrt(max(0.0, second_moment - mean * mean)))
+
     for offset in range(search_start, search_end, step):
         chunk = samples[offset:offset + pattern_len]
         if len(chunk) < pattern_len:
             break
 
-        # Normalize chunks. Guard against (near-)constant chunks — e.g. the
-        # mean-shifted silence of a clean capture, whose std is ~0 — where
-        # the +1e-10 epsilon would explode chunk_norm and fabricate a
-        # perfect (but spurious) correlation anywhere in the silence.
-        chunk_std = np.std(chunk)
+        # Preserve the near-constant-chunk rejection; avoid dividing small
+        # or effectively silent windows into spurious high correlations.
+        chunk_std = window_std(offset)
         if chunk_std < 1e-6:
             continue
-        chunk_norm = chunk / chunk_std
-        ref_norm = ref_dot / (np.std(ref_dot) + 1e-10)
 
-        # Cross-correlation
-        corr = float(np.abs(np.dot(chunk_norm, ref_norm)) / pattern_len)
+        # Same normalized dot-product formula, without an allocated
+        # normalized array for every candidate.
+        corr = float(np.abs(np.dot(chunk, ref_norm)) / (pattern_len * chunk_std))
 
         if corr > best_corr:
             best_corr = corr
@@ -848,9 +861,12 @@ def _find_dot_pattern(
         ):
             if fine_offset < 0 or fine_offset + pattern_len > len(samples):
                 continue
-            chunk = samples[int(fine_offset):int(fine_offset) + pattern_len]
-            chunk_norm = chunk / (np.std(chunk) + 1e-10)
-            corr = float(np.abs(np.dot(chunk_norm, ref_norm)) / pattern_len)
+            offset = int(fine_offset)
+            chunk = samples[offset:offset + pattern_len]
+            chunk_std = window_std(offset)
+            corr = float(
+                np.abs(np.dot(chunk, ref_norm)) / (pattern_len * (chunk_std + 1e-10))
+            )
             if corr > best_corr:
                 best_corr = corr
                 best_offset = float(fine_offset)
