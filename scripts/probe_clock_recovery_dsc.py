@@ -80,7 +80,10 @@ def main():
                     if noise:
                         signal += rng.normal(0, noise, size=len(signal)).astype(np.float32)
                     testpath = td / "timebase.wav"
-                    wavfile.write(testpath, sample_rate, signal)
+                    # Use conventional 16-bit PCM supported by both decoder
+                    # implementations without an optional ffmpeg executable.
+                    pcm16 = (np.clip(signal, -1.0, 1.0) * 32767).astype(np.int16)
+                    wavfile.write(testpath, sample_rate, pcm16)
                     outcomes = []
                     for label, decoder in decoders:
                         result = decoder.decode_file(testpath)
