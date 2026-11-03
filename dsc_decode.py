@@ -1217,9 +1217,28 @@ def analyze_bits(bits: list[int]) -> dict[str, object]:
     }
 
 
+# There are only 2**10 possible DSC codewords. Cache the existing,
+# standards-tolerant decoder's exact immutable results for all of them.
+# The table is built once; no validity or ECC criteria are changed.
+_DECODE_SYMBOL_TABLE = tuple(
+    decode_symbol(tuple((code >> i) & 1 for i in range(10)))
+    for code in range(1 << 10)
+)
+
+
 def _decode_symbols(bits: list[int]) -> list[DecodedSymbol]:
-    """Group a bit list into 10-bit symbols and decode each (trailing partial symbol dropped)."""
-    return [decode_symbol(tuple(bits[i : i + 10])) for i in range(0, len(bits) - 9, 10)]
+    """Decode 10-bit symbols using the exact prevalidated codeword table."""
+    decoded = []
+    for i in range(0, len(bits) - 9, 10):
+        code = (
+            bits[i] | (bits[i + 1] << 1) | (bits[i + 2] << 2)
+            | (bits[i + 3] << 3) | (bits[i + 4] << 4)
+            | (bits[i + 5] << 5) | (bits[i + 6] << 6)
+            | (bits[i + 7] << 7) | (bits[i + 8] << 8)
+            | (bits[i + 9] << 9)
+        )
+        decoded.append(_DECODE_SYMBOL_TABLE[code])
+    return decoded
 
 
 def _find_frames(decoded: list[DecodedSymbol], bit_offset: int) -> list[FrameCandidate]:
