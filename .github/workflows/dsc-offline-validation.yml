@@ -37,3 +37,6 @@ jobs:
       - name: Probe timing drift with synthetic AFSK
         if: github.ref_name == 'experiment/clock-recovery-transition'
         run: python scripts/probe_clock_recovery_fsk.py
+      - name: Probe full DSC frames with time-base drift and noise
+        if: github.ref_name == 'experiment/clock-recovery-transition'
+        run: python scripts/probe_clock_recovery_dsc.py --all
