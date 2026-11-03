@@ -40,6 +40,9 @@ jobs:
       - name: Probe long-burst clock tracking over 3600 bits
         if: github.ref_name == 'experiment/clock-longburst-tracking'
         run: python scripts/probe_clock_recovery_fsk.py --bits 3600
+      - name: Probe 3-second noisy DSC windows and processing cost
+        if: github.ref_name == 'experiment/clock-longburst-tracking'
+        run: python scripts/probe_three_second_windows.py
       - name: Probe full DSC frames with time-base drift and noise
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_dsc.py --all
