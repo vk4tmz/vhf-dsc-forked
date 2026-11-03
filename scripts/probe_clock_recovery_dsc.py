@@ -59,9 +59,9 @@ def main():
             ["git", "show", "9a8a770:dsc_decode.py"], cwd=ROOT))
         decoders = [
             ("baseline", load(orig, "dsc_original_timebase")),
-            ("revised", load(ROOT / "dsc_decode.py", "dsc_revised_timebase")),
+            ("revised_on", load(ROOT / "dsc_decode.py", "dsc_revised_timebase")),
         ]
-        totals = {label: 0 for label, _ in decoders}
+        totals = {label: 0 for label in ("baseline", "revised_on", "revised_off")}
         trials = 0
         for name, (kind, self_id) in fixtures.items():
             sample_rate, raw = wavfile.read(ROOT / "samples" / name)
@@ -90,6 +90,25 @@ def main():
                         passed = matches(result, kind, self_id)
                         totals[label] += int(passed)
                         outcomes.append(f"{label}={'PASS' if passed else 'MISS'}")
+                    # Same revised decoder, but with only clock recovery
+                    # disabled. This isolates timing-loop behaviour from
+                    # unrelated decoder implementation differences.
+                    revised = decoders[1][1]
+                    original_demod = revised.demodulate_candidates
+
+                    def disabled_demod(*args, **kwargs):
+                        kwargs["enable_clock_recovery"] = False
+                        return original_demod(*args, **kwargs)
+
+                    revised.demodulate_candidates = disabled_demod
+                    try:
+                        passed_off = matches(revised.decode_file(testpath), kind, self_id)
+                    finally:
+                        revised.demodulate_candidates = original_demod
+                    totals["revised_off"] += int(passed_off)
+                    outcomes.append(
+                        f"revised_off={'PASS' if passed_off else 'MISS'}"
+                    )
                     trials += 1
                     print(f"{name} rate_scale={drift:+.2f}% noise={noise:.2f}: "
                           + " ".join(outcomes), flush=True)
