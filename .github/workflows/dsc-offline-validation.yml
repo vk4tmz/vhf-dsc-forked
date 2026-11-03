@@ -1,0 +1,29 @@
+name: DSC decoder offline validation
+on:
+  push:
+    branches: [perf/dot-pattern-optimisation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install decoder dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Exhaustive codeword regression
+        run: python -m unittest discover -s tests -v
+      - name: DSC fixture regression
+        run: python test_samples.py
+      - name: Original versus fork (all six fixtures)
+        run: python scripts/benchmark_dot_pattern.py --all
