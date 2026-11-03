@@ -103,6 +103,27 @@ def main():
                 print(f"{name} drift={drift:+.2f}% audio={total/sample_rate:.2f}s "
                       + " ".join(outcome), flush=True)
         print(f"SUMMARY: {n} windows success={tally} max_wall_s={max_times}", flush=True)
+        # Unlike diagnostic-only matrices, this is a deterministic
+        # regression gate for the experimental clock-recovery branch.
+        if tally["clock_on"] != n:
+            raise AssertionError(
+                f"clock recovery lost {n - tally['clock_on']} of {n} known calls"
+            )
+
+        # Pure noise must never produce a validated DSC call. Use varied
+        # seeded noise amplitudes, all as 3-second 16-bit PCM WAVs.
+        for amp in (0.025, 0.05, 0.10):
+            rng = np.random.default_rng(931)
+            noise = rng.normal(0, amp, size=3 * 48000).astype(np.float32)
+            wav = td / "noise_only.wav"
+            wavfile.write(wav, 48000,
+                          (np.clip(noise, -1, 1) * 32767).astype(np.int16))
+            result, elapsed = decode_with_recovery(revised, wav, True)
+            print(f"noise_only amplitude={amp:.3f} "
+                  f"validated_calls={len(result.get('calls', []))} "
+                  f"wall_s={elapsed:.3f}", flush=True)
+            if result.get("calls"):
+                raise AssertionError("noise-only window produced DSC calls")
 
 
 if __name__ == "__main__":
