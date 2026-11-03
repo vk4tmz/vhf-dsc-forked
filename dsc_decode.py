@@ -979,6 +979,8 @@ def _demodulate_with_clock_recovery(
     # Clock recovery state
     timing_offset = 0.0
     timing_gain = 0.1  # Loop gain for timing recovery
+    previous_bit: int | None = None
+    previous_discriminator = 0.0
 
     for idx in range(n_bits):
         # Calculate sample position with timing offset
@@ -1003,42 +1005,45 @@ def _demodulate_with_clock_recovery(
         margin = abs(space - mark) / total if total else 0.0
         margins.append(margin)
 
-        # Clock recovery: Gardner-style timing error detector, gated on data
-        # transitions. The older implementation updated on EVERY bit with a
-        # constant sign term `1 if current_energy > 0 else -1` — energies are
-        # always positive, so the loop never saw a zero error and oscillated,
-        # corrupting clean strong signals (synthetic captures decoded as
-        # garbage while a pristine dot pattern was found). Standard Gardner
-        # only corrects when a symbol transition occurs.
-        if enable_clock_recovery and idx > 0 and start > 0 and end < len(samples):
-            # bits[-1] is the current bit, just appended above.
-            # The transition detector must compare against the preceding bit.
-            prev_bit = bits[-2]
-            if bit != prev_bit:
-                # Get samples at half-bit intervals for Gardner detector
-                early_start = round(center - samples_per_bit / 4)
-                late_start = round(center + samples_per_bit / 4)
-
-                if early_start >= 0 and late_start + window_len <= len(samples):
-                    early_chunk = samples[early_start:early_start + window_len]
-                    late_chunk = samples[late_start:late_start + window_len]
-
-                    early_space = float(np.dot(early_chunk, space_i) ** 2 + np.dot(early_chunk, space_q) ** 2)
-                    early_mark = float(np.dot(early_chunk, mark_i) ** 2 + np.dot(early_chunk, mark_q) ** 2)
-                    late_space = float(np.dot(late_chunk, space_i) ** 2 + np.dot(late_chunk, space_q) ** 2)
-                    late_mark = float(np.dot(late_chunk, mark_i) ** 2 + np.dot(late_chunk, mark_q) ** 2)
-
-                    # Gardner error: (late - early) * direction of transition
-                    early_energy = early_space if bit == 0 else early_mark
-                    late_energy = late_space if bit == 0 else late_mark
-                    current_energy = space if bit == 0 else mark
-
-                    direction = 1 if bit == 1 else -1
-                    timing_error = (late_energy - early_energy) * direction
-                    timing_offset += timing_gain * timing_error / (current_energy + 1e-10)
-
-                    # Clamp timing offset to prevent drift
-                    timing_offset = max(-0.4, min(0.4, timing_offset))
+        # Transition-gated Gardner-style timing recovery. Use the
+        # discriminated mark-versus-space value at the *boundary* between
+        # consecutive symbol centres. The original correction compared
+        # the new bit against bits[-1] (itself), making this entire loop
+        # unreachable. Simply switching to bits[-2] activated a biased
+        # early/late energy detector which improved positive drift while
+        # degrading negative drift. The midpoint discriminator instead
+        # uses the signed transition (previous discriminator - current)
+        # to adjust timing in either direction.
+        discriminator = (space - mark) / (total + 1e-10)
+        if (
+            enable_clock_recovery
+            and previous_bit is not None
+            and bit != previous_bit
+        ):
+            midpoint_center = center - samples_per_bit / 2
+            midpoint_start = round(midpoint_center - window_len / 2)
+            if 0 <= midpoint_start <= len(samples) - window_len:
+                midpoint = samples[midpoint_start:midpoint_start + window_len]
+                midpoint_space = float(
+                    np.dot(midpoint, space_i) ** 2
+                    + np.dot(midpoint, space_q) ** 2
+                )
+                midpoint_mark = float(
+                    np.dot(midpoint, mark_i) ** 2
+                    + np.dot(midpoint, mark_q) ** 2
+                )
+                midpoint_total = midpoint_space + midpoint_mark
+                midpoint_discriminator = (
+                    (midpoint_space - midpoint_mark) / (midpoint_total + 1e-10)
+                )
+                timing_error = (
+                    previous_discriminator - discriminator
+                ) * midpoint_discriminator
+                timing_offset += timing_gain * timing_error
+                # Keep corrections inside the original ±0.4 symbol bound.
+                timing_offset = max(-0.4, min(0.4, timing_offset))
+        previous_bit = bit
+        previous_discriminator = discriminator
 
     return bits, float(np.mean(margins)) if margins else 0.0
 
