@@ -1,7 +1,7 @@
 name: DSC decoder offline validation
 on:
   push:
-    branches: [perf/dot-pattern-optimisation]
+    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition]
   workflow_dispatch:
 
 permissions:
