@@ -976,6 +976,16 @@ def _demodulate_with_clock_recovery(
     mark_i = np.cos(2 * np.pi * mark_freq * t) * window
     mark_q = np.sin(2 * np.pi * mark_freq * t) * window
 
+    # All four matched-filter outputs depend only on the sample window
+    # start, not on the timing-loop state. Calculate each sliding dot
+    # product in compiled NumPy code once, then index at the exact
+    # integer positions chosen by the original tracking algorithm.
+    # This is mathematically the same correlation as np.dot(chunk, ref).
+    space_i_corr = np.correlate(samples, space_i, mode="valid")
+    space_q_corr = np.correlate(samples, space_q, mode="valid")
+    mark_i_corr = np.correlate(samples, mark_i, mode="valid")
+    mark_q_corr = np.correlate(samples, mark_q, mode="valid")
+
     bits: list[int] = []
     margins: list[float] = []
 
@@ -994,11 +1004,10 @@ def _demodulate_with_clock_recovery(
         if start < 0 or end > len(samples):
             continue
 
-        chunk = samples[start:end]
-
-        # Correlate with mark and space tones
-        space = float(np.dot(chunk, space_i) ** 2 + np.dot(chunk, space_q) ** 2)
-        mark = float(np.dot(chunk, mark_i) ** 2 + np.dot(chunk, mark_q) ** 2)
+        # Read the precomputed matched-filter energies at this bit's
+        # chosen timing position. No audio copying or np.dot in the loop.
+        space = float(space_i_corr[start] ** 2 + space_q_corr[start] ** 2)
+        mark = float(mark_i_corr[start] ** 2 + mark_q_corr[start] ** 2)
 
         bit = 1 if space >= mark else 0
         bits.append(bit)
@@ -1026,14 +1035,13 @@ def _demodulate_with_clock_recovery(
             midpoint_center = center - samples_per_bit / 2
             midpoint_start = round(midpoint_center - window_len / 2)
             if 0 <= midpoint_start <= len(samples) - window_len:
-                midpoint = samples[midpoint_start:midpoint_start + window_len]
                 midpoint_space = float(
-                    np.dot(midpoint, space_i) ** 2
-                    + np.dot(midpoint, space_q) ** 2
+                    space_i_corr[midpoint_start] ** 2
+                    + space_q_corr[midpoint_start] ** 2
                 )
                 midpoint_mark = float(
-                    np.dot(midpoint, mark_i) ** 2
-                    + np.dot(midpoint, mark_q) ** 2
+                    mark_i_corr[midpoint_start] ** 2
+                    + mark_q_corr[midpoint_start] ** 2
                 )
                 midpoint_total = midpoint_space + midpoint_mark
                 midpoint_discriminator = (
