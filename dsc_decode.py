@@ -624,12 +624,15 @@ def demodulate_candidates(
     for freq_offset in freq_offsets_hz:
         # Build reference frequencies — use measured tones if available
         # so each tone gets its own independent offset correction
+        # The matched-filter helpers already add freq_offset_hz.
+        # Pass base/measured tones here so the search offset is applied
+        # exactly once, rather than twice.
         if auto_space_hz is not None and auto_mark_hz is not None:
-            space_hz = auto_space_hz + float(freq_offset)
-            mark_hz = auto_mark_hz + float(freq_offset)
+            space_hz = auto_space_hz
+            mark_hz = auto_mark_hz
         else:
-            space_hz = SPACE_HZ + float(freq_offset)
-            mark_hz = MARK_HZ + float(freq_offset)
+            space_hz = SPACE_HZ
+            mark_hz = MARK_HZ
         # Try dot pattern sync first
         dot_synced = False
         if enable_dot_sync:
