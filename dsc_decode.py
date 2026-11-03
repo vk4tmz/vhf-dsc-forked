@@ -1011,7 +1011,9 @@ def _demodulate_with_clock_recovery(
         # garbage while a pristine dot pattern was found). Standard Gardner
         # only corrects when a symbol transition occurs.
         if enable_clock_recovery and idx > 0 and start > 0 and end < len(samples):
-            prev_bit = bits[-1]
+            # bits[-1] is the current bit, just appended above.
+            # The transition detector must compare against the preceding bit.
+            prev_bit = bits[-2]
             if bit != prev_bit:
                 # Get samples at half-bit intervals for Gardner detector
                 early_start = round(center - samples_per_bit / 4)
