@@ -27,3 +27,5 @@ jobs:
         run: python test_samples.py
       - name: Original versus fork (all six fixtures)
         run: python scripts/benchmark_dot_pattern.py --all
+      - name: Incremental demodulation optimisation comparison
+        run: python scripts/benchmark_dot_pattern.py --baseline-ref 5a92c5b --all
