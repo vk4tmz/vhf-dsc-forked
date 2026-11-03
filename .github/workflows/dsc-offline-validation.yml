@@ -34,3 +34,6 @@ jobs:
         run: |
           python scripts/diagnose_clock_recovery.py --wav samples/individual_call.wav
           python scripts/diagnose_clock_recovery.py --wav samples/noise.wav
+      - name: Probe timing drift with synthetic AFSK
+        if: github.ref_name == 'experiment/clock-recovery-transition'
+        run: python scripts/probe_clock_recovery_fsk.py
