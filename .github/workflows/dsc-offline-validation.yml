@@ -1,7 +1,7 @@
 name: DSC decoder offline validation
 on:
   push:
-    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once, experiment/clock-longburst-tracking]
+    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once, experiment/clock-longburst-tracking, experiment/clock-recovery-fast-correlators]
   workflow_dispatch:
 
 permissions:
@@ -38,11 +38,14 @@ jobs:
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_fsk.py
       - name: Probe long-burst clock tracking over 3600 bits
-        if: github.ref_name == 'experiment/clock-longburst-tracking'
+        if: (github.ref_name == 'experiment/clock-longburst-tracking' || github.ref_name == 'experiment/clock-recovery-fast-correlators')
         run: python scripts/probe_clock_recovery_fsk.py --bits 3600
       - name: Probe 3-second noisy DSC windows and processing cost
-        if: github.ref_name == 'experiment/clock-longburst-tracking'
+        if: (github.ref_name == 'experiment/clock-longburst-tracking' || github.ref_name == 'experiment/clock-recovery-fast-correlators')
         run: python scripts/probe_three_second_windows.py
+      - name: Compare fast correlators with longburst baseline
+        if: github.ref_name == 'experiment/clock-recovery-fast-correlators'
+        run: python scripts/benchmark_dot_pattern.py --baseline-ref 0666988 --all
       - name: Probe full DSC frames with time-base drift and noise
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_dsc.py --all
@@ -50,5 +53,5 @@ jobs:
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/diagnose_candidate_ranking.py
       - name: Diagnose dot synchronizer versus timing fallback
-        if: github.ref_name == 'experiment/clock-longburst-tracking' || github.ref_name == 'experiment/frequency-offset-once'
+        if: (github.ref_name == 'experiment/clock-longburst-tracking' || github.ref_name == 'experiment/clock-recovery-fast-correlators') || (github.ref_name == 'experiment/frequency-offset-once' || github.ref_name == 'experiment/clock-recovery-fast-correlators')
         run: python scripts/diagnose_dot_sync_fallback.py
