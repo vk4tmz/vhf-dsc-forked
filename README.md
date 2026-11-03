@@ -378,3 +378,20 @@ This benchmark uses only bundled WAVs and does not interact with radios,
 KA9Q multicast, or a running DSC listener. It checks recovered call identity,
 kind, raw symbols, and ECC, and reports wall-clock speedups. A further
 end-to-end trial of the KA9Q DSC integration is necessary before deployment.
+
+### Second optimisation: precomputed 10-bit symbol results
+
+The branch now precomputes all 1,024 possible 10-bit DSC codewords
+using the original `decode_symbol` implementation. Repeated
+`_decode_symbols` calls use this exact table instead of redoing
+parity/count calculations. Run the exhaustive parity test and the
+full fixtures before trusting performance results:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 test_samples.py
+python3 scripts/benchmark_dot_pattern.py --all
+```
+
+Decoder acceptance criteria and upstream's public API are unchanged.
+This is not yet validated on the Raspberry Pi.
