@@ -966,10 +966,12 @@ def _demodulate_with_clock_recovery(
     space_freq = (space_hz if space_hz is not None else SPACE_HZ) + freq_offset_hz
     mark_freq = (mark_hz if mark_hz is not None else MARK_HZ) + freq_offset_hz
 
-    space_i = np.cos(2 * np.pi * space_freq * t)
-    space_q = np.sin(2 * np.pi * space_freq * t)
-    mark_i = np.cos(2 * np.pi * mark_freq * t)
-    mark_q = np.sin(2 * np.pi * mark_freq * t)
+    # Window-weighted references are constant throughout the bit scan.
+    # Precompute once instead of creating a new weighted chunk per bit.
+    space_i = np.cos(2 * np.pi * space_freq * t) * window
+    space_q = np.sin(2 * np.pi * space_freq * t) * window
+    mark_i = np.cos(2 * np.pi * mark_freq * t) * window
+    mark_q = np.sin(2 * np.pi * mark_freq * t) * window
 
     bits: list[int] = []
     margins: list[float] = []
@@ -987,7 +989,7 @@ def _demodulate_with_clock_recovery(
         if start < 0 or end > len(samples):
             continue
 
-        chunk = samples[start:end] * window
+        chunk = samples[start:end]
 
         # Correlate with mark and space tones
         space = float(np.dot(chunk, space_i) ** 2 + np.dot(chunk, space_q) ** 2)
@@ -1016,8 +1018,8 @@ def _demodulate_with_clock_recovery(
                 late_start = round(center + samples_per_bit / 4)
 
                 if early_start >= 0 and late_start + window_len <= len(samples):
-                    early_chunk = samples[early_start:early_start + window_len] * window
-                    late_chunk = samples[late_start:late_start + window_len] * window
+                    early_chunk = samples[early_start:early_start + window_len]
+                    late_chunk = samples[late_start:late_start + window_len]
 
                     early_space = float(np.dot(early_chunk, space_i) ** 2 + np.dot(early_chunk, space_q) ** 2)
                     early_mark = float(np.dot(early_chunk, mark_i) ** 2 + np.dot(early_chunk, mark_q) ** 2)
