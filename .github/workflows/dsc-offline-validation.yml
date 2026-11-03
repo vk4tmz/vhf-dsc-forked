@@ -1,7 +1,7 @@
 name: DSC decoder offline validation
 on:
   push:
-    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition]
+    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once]
   workflow_dispatch:
 
 permissions:
@@ -30,16 +30,16 @@ jobs:
       - name: Incremental demodulation optimisation comparison
         run: python scripts/benchmark_dot_pattern.py --baseline-ref 5a92c5b --all
       - name: Diagnose clock recovery enabled versus disabled
-        if: github.ref_name == 'experiment/clock-recovery-transition'
+        if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: |
           python scripts/diagnose_clock_recovery.py --wav samples/individual_call.wav
           python scripts/diagnose_clock_recovery.py --wav samples/noise.wav
       - name: Probe timing drift with synthetic AFSK
-        if: github.ref_name == 'experiment/clock-recovery-transition'
+        if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_fsk.py
       - name: Probe full DSC frames with time-base drift and noise
-        if: github.ref_name == 'experiment/clock-recovery-transition'
+        if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_dsc.py --all
       - name: Diagnose dot-sync ranking in shifted all-ships frames
-        if: github.ref_name == 'experiment/clock-recovery-transition'
+        if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/diagnose_candidate_ranking.py
