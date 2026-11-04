@@ -942,6 +942,15 @@ def _find_signal_start(samples: np.ndarray, sample_rate: int) -> int | None:
     return None
 
 
+# Offline ablation knobs. Defaults reproduce the validated fast-correlator path.
+# Do not set globally in a live worker: experimental harness loads each case
+# in a distinct Python process (no concurrent decoding).
+EXPERIMENT_TONE_WEIGHT_POWER = 0.0
+EXPERIMENT_CLOCK_GAIN_EARLY = 0.1
+EXPERIMENT_CLOCK_GAIN_LATE = 0.1
+EXPERIMENT_CLOCK_SWITCH_BITS = 200
+
+
 def _demodulate_with_clock_recovery(
     samples: np.ndarray,
     sample_rate: int,
@@ -991,7 +1000,9 @@ def _demodulate_with_clock_recovery(
 
     # Clock recovery state
     timing_offset = 0.0
-    timing_gain = 0.1  # Loop gain for timing recovery
+    # Separate gains for early acquisition and later tracking, not a true
+    # phasing-lock transition. Use this only as a controlled offline proxy.
+    timing_gain = EXPERIMENT_CLOCK_GAIN_EARLY
     previous_bit: int | None = None
     previous_discriminator = 0.0
 
@@ -1008,6 +1019,11 @@ def _demodulate_with_clock_recovery(
         # chosen timing position. No audio copying or np.dot in the loop.
         space = float(space_i_corr[start] ** 2 + space_q_corr[start] ** 2)
         mark = float(mark_i_corr[start] ** 2 + mark_q_corr[start] ** 2)
+        if EXPERIMENT_TONE_WEIGHT_POWER:
+            # SDRangel divides tone-correlation amplitude by frequency.
+            # Matching power correction is freq**(-2); zero is baseline.
+            # Normalise to 1300 Hz so floating-point magnitudes stay useful.
+            mark *= (space_freq / mark_freq) ** EXPERIMENT_TONE_WEIGHT_POWER
 
         bit = 1 if space >= mark else 0
         bits.append(bit)
@@ -1017,6 +1033,8 @@ def _demodulate_with_clock_recovery(
         margin = abs(space - mark) / total if total else 0.0
         margins.append(margin)
 
+        timing_gain = (EXPERIMENT_CLOCK_GAIN_EARLY if idx < EXPERIMENT_CLOCK_SWITCH_BITS
+                       else EXPERIMENT_CLOCK_GAIN_LATE)
         # Transition-gated Gardner-style timing recovery. Use the
         # discriminated mark-versus-space value at the *boundary* between
         # consecutive symbol centres. The original correction compared
@@ -1043,6 +1061,8 @@ def _demodulate_with_clock_recovery(
                     mark_i_corr[midpoint_start] ** 2
                     + mark_q_corr[midpoint_start] ** 2
                 )
+                if EXPERIMENT_TONE_WEIGHT_POWER:
+                    midpoint_mark *= (space_freq / mark_freq) ** EXPERIMENT_TONE_WEIGHT_POWER
                 midpoint_total = midpoint_space + midpoint_mark
                 midpoint_discriminator = (
                     (midpoint_space - midpoint_mark) / (midpoint_total + 1e-10)
