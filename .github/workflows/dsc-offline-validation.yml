@@ -1,7 +1,7 @@
 name: DSC decoder offline validation
 on:
   push:
-    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once, experiment/clock-longburst-tracking, experiment/clock-recovery-fast-correlators]
+    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once, experiment/clock-longburst-tracking, experiment/clock-recovery-fast-correlators, experiment/dsc-candidate-window-audit]
   workflow_dispatch:
 
 permissions:
@@ -49,7 +49,7 @@ jobs:
       - name: Check complete candidate bitstream parity
         if: github.ref_name == 'experiment/clock-recovery-fast-correlators'
         run: python scripts/check_fast_correlator_bit_parity.py
-      - name: Probe full DSC frames with time-base drift and noise
+      - name: Audit DSC candidate ranks (read-only baseline)\n        if: github.ref_name == 'experiment/dsc-candidate-window-audit'\n        run: python scripts/audit_candidates_and_windows.py\n      - name: Probe full DSC frames with time-base drift and noise
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_dsc.py --all
       - name: Diagnose dot-sync ranking in shifted all-ships frames
