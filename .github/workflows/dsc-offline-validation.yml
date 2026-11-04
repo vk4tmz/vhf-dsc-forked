@@ -1,7 +1,7 @@
 name: DSC decoder offline validation
 on:
   push:
-    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once, experiment/clock-longburst-tracking, experiment/clock-recovery-fast-correlators, experiment/dsc-candidate-window-audit]
+    branches: [perf/dot-pattern-optimisation, experiment/clock-recovery-transition, experiment/frequency-offset-once, experiment/clock-longburst-tracking, experiment/clock-recovery-fast-correlators, experiment/dsc-candidate-window-audit, experiment/dsc-tone-clock-ablation]
   workflow_dispatch:
 
 permissions:
@@ -52,6 +52,9 @@ jobs:
       - name: Audit DSC candidate ranks (read-only baseline)
         if: github.ref_name == 'experiment/dsc-candidate-window-audit'
         run: python scripts/audit_candidates_and_windows.py --full --windows
+      - name: Offline tone and clock-gain ablation
+        if: github.ref_name == 'experiment/dsc-tone-clock-ablation'
+        run: python scripts/probe_tone_clock_ablation.py --extended
       - name: Probe full DSC frames with time-base drift and noise
         if: github.ref_name != 'perf/dot-pattern-optimisation'
         run: python scripts/probe_clock_recovery_dsc.py --all
