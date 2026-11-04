@@ -63,3 +63,44 @@ WAV files for window experiments, which are removed automatically.
 4. Require preserved 6/6 fixture parity, 15/15 short-window results,
    30/30 drift/noise recovery and zero false calls before proposing any
    live change.
+
+## Measured results: GitHub Actions (2026-11-04)
+
+CI on Linux/x86 (not a Raspberry Pi), five authentic off-air call fixtures:
+
+| File | Candidate count | Valid expected candidate ranks | Top-8 recovery |
+| --- | ---: | --- | --- |
+| individual_call.wav | 9 | 1,2,4,5,8 | yes |
+| individual_call_2.wav | 9 | 1,3,4,5,6,7,8 | yes |
+| all_ships_call.wav | 9 | 1..9 | yes |
+| distress_relay.wav | 9 | 1..9 | yes |
+| distress_acknowledgement.wav | 9 | 1..9 | yes |
+
+All five originals recover with the existing top-eight cap, as well as
+with exhaustive candidate parsing. This **does not support** immediately
+removing the cap; pathological noisy recordings may still differ.
+
+Both injected arrival phases (0.25s and 1.80s) yielded the correct validated
+call in **all five** fixtures with both 3s and 5s / 2s-hop windows (10/10
+fixture/phase combinations for each duration). At 1.80s, the 3s
+windows do not necessarily contain the entire source recording: the
+decoder nevertheless recovered a valid message from at least one
+partial window. This demonstrates **useful partial-burst tolerance** and
+contradicts a simple assertion that arbitrary split frames always fail.
+
+No demonstrated win for 5s windows in these data; 5s has higher
+computational cost and is not justified for the live Pi service.
+
+The preexisting full drift/noise matrix also retained **30/30** correct
+recoveries. No production files changed.
+
+### Interpretation and remaining gaps
+
+These fixtures are 1.625–1.875s and have clean/simple signal structures.
+They do **not** prove all real longer DSC calls can fit in three-second
+windows. No actual real-time Pi 4 timing measurement was run for 5s
+windows. To determine the 21-hour zero-call root cause, a real CH70
+transmission capture or controlled RF-injected test is still needed.
+
+Do not make the top-eight or window-length changes solely from these
+measurements.
